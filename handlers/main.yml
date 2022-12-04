@@ -1,0 +1,10 @@
+---
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: "Restart flightlgo service"
+  ansible.builtin.systemd:
+    name: "flightlgo@{{ item.icao }}"
+    state: restarted
+
