@@ -1,0 +1,71 @@
+---
+- name: Create flightLGo directory
+  ansible.builtin.file:
+    path: "/opt/flightLGo/bin"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Install flightLGo binary
+  ansible.builtin.get_url:
+    dest: "/opt/flightLGo/bin/flightLGo"
+    url: "https://github.com/snip/flightLGo/releases/download/v0.0.0b1/flightLGo.x64"
+    checksum: "sha256:19c2c65c78aba59dfc8bc2b0fb524d604b06719c1c3af2855dd7f8ce77499ce0"
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Install libfap package
+  ansible.builtin.apt:
+    deb: "https://www.pakettiradio.net/downloads/libfap/1.5/libfap6_1.5_amd64.deb"
+
+- name: Create main config directory
+  ansible.builtin.file:
+    path: /etc/opt/flightlgo
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Create airfield specific config directories
+  ansible.builtin.file:
+    path: "/etc/opt/flightlgo/{{ item.icao }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  loop: "{{ flightlgo.airfield }}"
+
+- name: Create airfield config files
+  ansible.builtin.template:
+    src: "airfield_config.j2"
+    dest: "/etc/opt/flightlgo/{{ item.icao }}/.env"
+    owner: root
+    group: root
+    mode: 0644
+  loop: "{{ flightlgo.airfield }}"
+  notify: Restart flightlgo service
+
+- name: Create visible config symlinks
+  ansible.builtin.file:
+    src: ".env"
+    path: "/etc/opt/flightlgo/{{ item.icao }}/{{ item.icao }}.env"
+    state: link
+  loop: "{{ flightlgo.airfield }}"
+
+- name: Install systemd service unit
+  ansible.builtin.copy:
+    src: "flightlgo@.service"
+    dest: "/etc/systemd/system/"
+    owner: root
+    group: root
+    mode: 0644
+  notify: Reload systemd daemon
+
+- name: Enable services
+  ansible.builtin.systemd:
+    name: "flightlgo@{{ item.icao }}"
+    enabled: true
+    state: started
+  loop: "{{ flightlgo.airfield }}"
